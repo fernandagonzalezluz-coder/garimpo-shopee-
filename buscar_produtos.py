@@ -1,10 +1,10 @@
+
 import hashlib
 import json
 import math
 import os
 import time
 import urllib.request
-import urllib.error
 from datetime import datetime, timezone
 
 API_URL = "https://open-api.affiliate.shopee.com.br/graphql"
@@ -33,6 +33,16 @@ def numero(valor, padrao=0):
         return padrao
 
 
+def percentual(valor):
+    valor = numero(valor)
+
+    # A API pode informar 0.20 ou 20 para representar 20%
+    if 0 < valor <= 1:
+        valor *= 100
+
+    return valor
+
+
 def buscar_produtos(palavra):
     if not APP_ID or not SECRET:
         raise ValueError(
@@ -43,7 +53,7 @@ def buscar_produtos(palavra):
     {
       productOfferV2(
         keyword: %s,
-        sortType: 5,
+        sortType: 2,
         page: 1,
         limit: 20
       ) {
@@ -55,10 +65,12 @@ def buscar_produtos(palavra):
           imageUrl
           priceMin
           priceMax
-          commissionRate
+          priceDiscountRate
           sales
           ratingStar
           shopName
+          periodStartTime
+          periodEndTime
         }
       }
     }
@@ -101,6 +113,31 @@ def buscar_produtos(palavra):
     return oferta.get("nodes") or []
 
 
+def preparar_produto(produto):
+    desconto = percentual(produto.get("priceDiscountRate"))
+
+    preco = numero(
+        produto.get("priceMin"),
+        numero(produto.get("priceMax"))
+    )
+
+    preco_original_estimado = None
+
+    if preco > 0 and 0 < desconto < 100:
+        preco_original_estimado = round(
+            preco / (1 - desconto / 100),
+            2
+        )
+
+    produto["descontoPercentual"] = round(desconto, 2)
+    produto["precoPromocional"] = preco
+    produto["precoOriginalEstimado"] = preco_original_estimado
+
+    produto["temDesconto"] = desconto > 0
+
+    return produto
+
+
 def pontuar_produtos(produtos):
     maior_venda = max(
         [numero(p.get("sales")) for p in produtos] or [1]
@@ -109,54 +146,49 @@ def pontuar_produtos(produtos):
     maior_venda = max(maior_venda, 1)
 
     for produto in produtos:
+        desconto = numero(produto.get("descontoPercentual"))
         vendas = numero(produto.get("sales"))
-        comissao = numero(produto.get("commissionRate"))
         avaliacao = numero(produto.get("ratingStar"))
 
-        if comissao > 1:
-            comissao = comissao / 100
+        # Desconto: até 50 pontos
+        pontos_desconto = min(max(desconto, 0), 70) / 70 * 50
 
-        # Vendas: até 40 pontos
+        # Vendas: até 25 pontos
         pontos_vendas = (
             math.log1p(max(vendas, 0))
             / math.log1p(maior_venda)
-        ) * 40
+        ) * 25
 
-        # Comissão: até 30 pontos
-        pontos_comissao = min(max(comissao, 0), 1) * 30
-
-        # Avaliação: até 30 pontos
+        # Avaliação: até 25 pontos
         pontos_avaliacao = (
             min(max(avaliacao, 0), 5) / 5
-        ) * 30
+        ) * 25
 
         pontuacao = (
-            pontos_vendas
-            + pontos_comissao
+            pontos_desconto
+            + pontos_vendas
             + pontos_avaliacao
         )
 
         produto["scoreGarimpo"] = round(pontuacao, 2)
 
-        if vendas <= 0:
-            classificacao = "Poucas informações de vendas"
-        elif avaliacao <= 0:
-            classificacao = "Avaliação não informada"
-        elif pontuacao >= 65:
-            classificacao = "Oportunidade em destaque"
-        elif pontuacao >= 40:
-            classificacao = "Boa oportunidade para analisar"
-        else:
-            classificacao = "Oportunidade para avaliar"
-
-        produto["classificacaoGarimpo"] = classificacao
-
         produto["observacoesGarimpo"] = {
+            "descontoPercentual": round(desconto, 2),
             "vendas": int(vendas),
             "avaliacao": avaliacao,
-            "comissaoPercentual": round(comissao * 100, 2),
             "pontuacao": round(pontuacao, 2)
         }
+
+        if desconto <= 0:
+            classificacao = "Desconto não informado"
+        elif pontuacao >= 70:
+            classificacao = "Oferta em destaque"
+        elif pontuacao >= 45:
+            classificacao = "Boa oferta para analisar"
+        else:
+            classificacao = "Oferta para avaliar"
+
+        produto["classificacaoGarimpo"] = classificacao
 
     return produtos
 
@@ -166,21 +198,33 @@ def main():
     erros = []
 
     print("Iniciando Meu Garimpo Shopee...")
+    print("Procurando produtos com descontos...")
 
     for categoria in CATEGORIAS:
         try:
             produtos = buscar_produtos(categoria)
 
+            encontrados = 0
+
             for produto in produtos:
+                produto = preparar_produto(produto)
+
                 identificador = produto.get("itemId")
 
-                if identificador is not None:
-                    todos[str(identificador)] = produto
+                if identificador is None:
+                    continue
+
+                # Prioriza produtos com desconto informado
+                if produto["descontoPercentual"] <= 0:
+                    continue
+
+                todos[str(identificador)] = produto
+                encontrados += 1
 
             print(
                 categoria,
-                len(produtos),
-                "produtos encontrados"
+                encontrados,
+                "produtos com desconto"
             )
 
         except Exception as erro:
@@ -197,8 +241,8 @@ def main():
     lista.sort(
         key=lambda p: (
             numero(p.get("scoreGarimpo")),
-            numero(p.get("sales")),
-            numero(p.get("commissionRate"))
+            numero(p.get("descontoPercentual")),
+            numero(p.get("sales"))
         ),
         reverse=True
     )
@@ -208,6 +252,7 @@ def main():
     relatorio = {
         "data": datetime.now(timezone.utc).isoformat(),
         "total": len(lista),
+        "criterioPrincipal": "Desconto promocional",
         "categoriasPesquisadas": CATEGORIAS,
         "erros": erros,
         "produtos": lista[:100]
@@ -225,7 +270,7 @@ def main():
 
     print("--------------------------------")
     print("GARIMPO FINALIZADO!")
-    print("Total de produtos:", len(lista))
+    print("Produtos com desconto:", len(lista))
     print("Produtos salvos:", min(len(lista), 100))
     print("Erros encontrados:", len(erros))
     print("Arquivo atualizado:", caminho)
