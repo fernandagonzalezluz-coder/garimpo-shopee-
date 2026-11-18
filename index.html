@@ -1,0 +1,105 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meu Garimpo Shopee</title>
+<style>
+body{font-family:Arial,sans-serif;background:#fff5f2;margin:0;color:#333}
+header{background:#ee4d2d;color:white;padding:25px 16px;text-align:center}
+h1{margin:0;font-size:25px}
+header p{margin:8px 0 0}
+main{padding:16px;max-width:700px;margin:auto}
+input{width:100%;padding:13px;box-sizing:border-box;border:1px solid #ddd;border-radius:10px;font-size:16px}
+.info{background:white;padding:14px;border-radius:12px;margin:14px 0}
+#produtos{display:grid;gap:14px}
+.produto{background:white;border-radius:12px;padding:14px;display:flex;gap:12px;align-items:center}
+.produto img{width:95px;height:95px;object-fit:contain;border-radius:8px}
+.detalhes{flex:1;min-width:0}
+.nome{font-weight:bold;margin-bottom:8px}
+.preco{color:#ee4d2d;font-weight:bold;font-size:18px}
+.comissao{font-size:13px;color:#16834a;margin:7px 0}
+a{display:inline-block;background:#ee4d2d;color:white;text-decoration:none;padding:9px 12px;border-radius:8px;font-size:13px}
+small{color:#777}
+</style>
+</head>
+<body>
+<header>
+<h1>🧡 Meu Garimpo Shopee</h1>
+<p>As melhores oportunidades para divulgar!</p>
+</header>
+<main>
+<input id="busca" placeholder="🔎 Buscar produto..." oninput="filtrar()">
+<div class="info" id="resumo">Carregando oportunidades...</div>
+<div id="produtos"></div>
+</main>
+<script>
+let lista=[];
+
+function dinheiro(v){
+ if(v===undefined||v===null||v==="") return "Preço não informado";
+ let n=Number(v);
+ if(!Number.isFinite(n)) return v;
+ return n.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+}
+
+function mostrar(itens){
+ const area=document.getElementById("produtos");
+ area.innerHTML="";
+ if(!itens.length){area.innerHTML="<p>Nenhum produto encontrado.</p>";return;}
+ itens.forEach(p=>{
+  const nome=p.productName||"Produto Shopee";
+  const preco=p.priceMin??p.priceMax;
+  let taxa=Number(p.commissionRate);
+  let comissao=Number.isFinite(taxa)?(taxa<=1?taxa*100:taxa):null;
+  const link=p.offerLink||p.productLink||"#";
+  const imagem=p.imageUrl||"";
+  const card=document.createElement("div");
+  card.className="produto";
+  const img=document.createElement("img");
+  img.src=imagem;
+  img.alt=nome;
+  img.onerror=()=>img.style.display="none";
+  const detalhes=document.createElement("div");
+  detalhes.className="detalhes";
+  const titulo=document.createElement("div");
+  titulo.className="nome";
+  titulo.textContent=nome;
+  const valor=document.createElement("div");
+  valor.className="preco";
+  valor.textContent=dinheiro(preco);
+  const com=document.createElement("div");
+  com.className="comissao";
+  com.textContent=comissao===null?"Comissão não informada":"Comissão: "+comissao.toFixed(2)+"%";
+  const botao=document.createElement("a");
+  botao.textContent="Ver oportunidade";
+  botao.href=link;
+  botao.target="_blank";
+  botao.rel="noopener";
+  detalhes.append(titulo,valor,com,botao);
+  card.append(img,detalhes);
+  area.append(card);
+ });
+}
+
+function filtrar(){
+ const termo=document.getElementById("busca").value.toLowerCase();
+ mostrar(lista.filter(p=>(p.productName||"").toLowerCase().includes(termo)));
+}
+
+fetch("./data/produtos.json")
+.then(r=>{if(!r.ok)throw Error();return r.json();})
+.then(d=>{
+ lista=d.produtos||[];
+ document.getElementById("resumo").textContent=
+ "✨ "+lista.length+" oportunidades encontradas";
+ mostrar(lista);
+})
+.catch(()=>{
+ document.getElementById("resumo").textContent=
+ "Não foi possível carregar os produtos. Tente novamente mais tarde.";
+});
+</script>
+</body>
+</html>
