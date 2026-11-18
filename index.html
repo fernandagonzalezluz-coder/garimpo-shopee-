@@ -6,13 +6,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Meu Garimpo Shopee</title>
 <style>
+*{box-sizing:border-box}
 body{font-family:Arial,sans-serif;background:#fff5f2;margin:0;color:#333}
 header{background:#ee4d2d;color:white;padding:25px 16px;text-align:center}
 h1{margin:0;font-size:25px}
 header p{margin:8px 0 0}
-main{padding:16px;max-width:700px;margin:auto}
-input{width:100%;padding:13px;box-sizing:border-box;border:1px solid #ddd;border-radius:10px;font-size:16px}
-.info{background:white;padding:14px;border-radius:12px;margin:14px 0}
+main{padding:16px;max-width:760px;margin:auto}
+input{width:100%;padding:13px;border:1px solid #ddd;border-radius:10px;font-size:16px}
+.info,.painel{background:white;padding:14px;border-radius:12px;margin:14px 0}
 #produtos{display:grid;gap:14px}
 .produto{background:white;border-radius:12px;padding:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .produto img{width:95px;height:95px;object-fit:contain;border-radius:8px}
@@ -22,153 +23,170 @@ input{width:100%;padding:13px;box-sizing:border-box;border:1px solid #ddd;border
 .comissao{font-size:13px;color:#16834a;margin:7px 0}
 a,.botao{display:inline-block;background:#ee4d2d;color:white;text-decoration:none;padding:10px 12px;border:0;border-radius:8px;font-size:13px;margin:4px 4px 4px 0;cursor:pointer}
 .preparar{background:#16834a;font-weight:bold}
+.secundario{background:#666}
+.painel{display:none;border:2px solid #ee4d2d}
+.painel h2{font-size:20px;margin:0 0 8px;color:#ee4d2d}
+.bloco{background:#fff8f5;border-radius:9px;padding:12px;margin:12px 0}
+.bloco h3{font-size:15px;margin:0 0 8px}
+.bloco p{white-space:pre-wrap;line-height:1.5;margin:0;font-size:14px}
+.acoes{display:flex;flex-wrap:wrap;gap:5px}
 small{color:#777}
 </style>
 </head>
 <body>
 <header>
 <h1>🧡 Meu Garimpo Shopee</h1>
-<p>As melhores oportunidades para divulgar!</p>
+<p>Encontre produtos e prepare sua divulgação em um só lugar!</p>
 </header>
 <main>
 <input id="busca" placeholder="🔎 Buscar produto..." oninput="filtrar()">
 <div class="info" id="resumo">Carregando oportunidades...</div>
 <div id="produtos"></div>
-</main>
 
+<section class="painel" id="painel">
+<h2>✨ Sua divulgação está pronta!</h2>
+<p id="produtoSelecionado"></p>
+<div id="conteudo"></div>
+<div class="acoes">
+<button class="botao preparar" onclick="copiarTudo()">📋 Copiar divulgação completa</button>
+<button class="botao secundario" onclick="fecharPainel()">Fechar</button>
+</div>
+<p><small>Confira preço, informações e link antes de publicar. A publicação e a vinculação do produto são finalizadas no Shopee.</small></p>
+</section>
+</main>
 <script>
 let lista=[];
+let divulgacaoAtual=null;
 
 function dinheiro(v){
  if(v===undefined||v===null||v==="") return "Preço não informado";
  let n=Number(v);
- if(!Number.isFinite(n)) return v;
+ if(!Number.isFinite(n)) return String(v);
  return n.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 }
-
-function prepararDivulgacao(p){
- const nome=p.productName||"Produto Shopee";
- const link=p.offerLink||p.productLink||"Não informado";
- let taxa=Number(p.commissionRate);
- let comissao=Number.isFinite(taxa)?(taxa<=1?taxa*100:taxa):null;
-
- const prompt=`Quero preparar a divulgação deste produto como afiliada da Shopee Brasil.
-
-PRODUTO: ${nome}
-PREÇO INFORMADO: ${dinheiro(p.priceMin??p.priceMax)}
-COMISSÃO INFORMADA: ${comissao===null?"Não informada":comissao.toFixed(2)+"%"}
-LOJA: ${p.shopName||"Não informada"}
-AVALIAÇÃO: ${p.ratingStar||"Não informada"}
-VENDAS: ${p.sales||"Não informadas"}
-LINK DE AFILIADA: ${link}
-IMAGEM: ${p.imageUrl||"Não informada"}
-
-Prepare um conteúdo de divulgação em português do Brasil:
-1. Uma descrição curta, atrativa e persuasiva.
-2. Um roteiro para vídeo vertical de 15 a 30 segundos.
-3. Sugestões de cenas e textos na tela.
-4. Uma narração simples e natural.
-5. Uma chamada para ação.
-6. Uma legenda para publicar no Shopee Vídeo.
-
-Se houver recurso de criação de vídeo disponível, ajude a criar o vídeo. Caso contrário, entregue o roteiro e as orientações para montar o vídeo.
-
-IMPORTANTE:
-- Não invente características, benefícios, descontos, preços, estoque ou informações que não foram fornecidas.
-- Não altere o link de afiliada. Preserve-o exatamente como está.
-- Use linguagem simples, criativa e comercial.
-- Não prometa resultados de venda.
-- Deixe o conteúdo pronto para eu usar.`;
-
+function taxaComissao(p){
+ let n=Number(p.commissionRate);
+ return Number.isFinite(n)?(n<=1?n*100:n):null;
+}
+function escapar(s){
+ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function criarTexto(p){
+ const nome=p.productName||"este produto";
+ const preco=dinheiro(p.priceMin??p.priceMax);
+ const link=p.offerLink||p.productLink||"";
+ const descricao="Olha essa oportunidade! 🧡\n"+nome+"\nPreço informado: "+preco+".\nConfira os detalhes no link e veja se combina com você!";
+ const roteiro="CENA 1 (0–5s)\nMostre a imagem do produto. Texto: “Olha essa oportunidade!”\n\nCENA 2 (5–12s)\nMostre o produto e destaque: "+nome+".\n\nCENA 3 (12–20s)\nExiba o preço informado: "+preco+". Convide a pessoa a conferir os detalhes.\n\nCENA 4 (20–25s)\nFinalize com: “Toque no produto vinculado para conferir!”";
+ const cenas="1. Abertura com a imagem do produto.\n2. Nome do produto na tela.\n3. Preço informado, se disponível.\n4. Tela final convidando a conferir o produto.";
+ const narracao="Encontrei essa oportunidade na Shopee! "+nome+". O preço informado é "+preco+". Toque no produto vinculado para conferir todos os detalhes antes de comprar!";
+ const chamada="🧡 Gostou? Toque no produto vinculado e confira na Shopee!";
+ const legenda="✨ Garimpo do dia! "+nome+"\nConfira os detalhes e o preço atualizado diretamente na Shopee. 🧡\n#Shopee #Achadinhos #Oferta";
+ return {nome,preco,link,descricao,roteiro,cenas,narracao,chamada,legenda};
+}
+function mostrarDivulgacao(p){
+ divulgacaoAtual=criarTexto(p);
+ document.getElementById("produtoSelecionado").textContent=divulgacaoAtual.nome+" • "+divulgacaoAtual.preco;
+ const campos=[
+  ["Descrição",divulgacaoAtual.descricao],
+  ["Roteiro para vídeo (até 25 segundos)",divulgacaoAtual.roteiro],
+  ["Sugestões de cenas",divulgacaoAtual.cenas],
+  ["Narração",divulgacaoAtual.narracao],
+  ["Chamada para ação",divulgacaoAtual.chamada],
+  ["Legenda para Shopee Vídeo",divulgacaoAtual.legenda],
+  ["Seu link de afiliada",divulgacaoAtual.link||"Link não disponível nos dados deste produto."]
+ ];
+ document.getElementById("conteudo").innerHTML=campos.map((c,i)=>'<div class="bloco"><h3>'+escapar(c[0])+'</h3><p id="texto'+i+'">'+escapar(c[1])+'</p><button class="botao secundario" onclick="copiarCampo('+i+')">Copiar</button></div>').join("");
+ const painel=document.getElementById("painel");
+ painel.style.display="block";
+ painel.scrollIntoView({behavior:"smooth",block:"start"});
+}
+async function copiarTexto(texto){
  try{
-  const area=document.createElement("textarea");
-  area.value=prompt;
-  area.style.position="fixed";
-  area.style.opacity="0";
-  document.body.appendChild(area);
-  area.select();
-  const copiou=document.execCommand("copy");
-  document.body.removeChild(area);
-
-  if(copiou){
-   alert("🧡 Informações copiadas! Agora abra o ChatGPT e cole a mensagem para preparar sua divulgação.");
+  if(navigator.clipboard && window.isSecureContext){
+   await navigator.clipboard.writeText(texto);
   }else{
-   alert("Não foi possível copiar automaticamente. Tente novamente.");
+   const area=document.createElement("textarea");
+   area.value=texto;
+   area.style.position="fixed";
+   area.style.opacity="0";
+   document.body.appendChild(area);
+   area.select();
+   document.execCommand("copy");
+   area.remove();
   }
+  alert("Copiado! 🧡");
  }catch(e){
-  alert("Não foi possível copiar. Tente novamente.");
+  alert("Não foi possível copiar automaticamente. Selecione o texto e copie manualmente.");
  }
 }
-
+function copiarCampo(i){
+ const el=document.getElementById("texto"+i);
+ copiarTexto(el?el.textContent:"");
+}
+function copiarTudo(){
+ if(!divulgacaoAtual)return;
+ const d=divulgacaoAtual;
+ copiarTexto("PRODUTO: "+d.nome+"\nPREÇO INFORMADO: "+d.preco+"\n\nDESCRIÇÃO\n"+d.descricao+"\n\nROTEIRO\n"+d.roteiro+"\n\nCENAS\n"+d.cenas+"\n\nNARRAÇÃO\n"+d.narracao+"\n\nCHAMADA\n"+d.chamada+"\n\nLEGENDA\n"+d.legenda+"\n\nLINK DE AFILIADA\n"+d.link);
+}
+function fecharPainel(){
+ document.getElementById("painel").style.display="none";
+}
 function mostrar(itens){
  const area=document.getElementById("produtos");
  area.innerHTML="";
- if(!itens.length){area.innerHTML="<p>Nenhum produto encontrado.</p>";return;}
-
+ if(!itens.length){
+  area.innerHTML="<p>Nenhum produto encontrado.</p>";
+  return;
+ }
  itens.forEach(p=>{
   const nome=p.productName||"Produto Shopee";
   const preco=p.priceMin??p.priceMax;
-  let taxa=Number(p.commissionRate);
-  let comissao=Number.isFinite(taxa)?(taxa<=1?taxa*100:taxa):null;
+  const comissao=taxaComissao(p);
   const link=p.offerLink||p.productLink||"#";
-  const imagem=p.imageUrl||"";
-
   const card=document.createElement("div");
   card.className="produto";
-
   const img=document.createElement("img");
-  img.src=imagem;
+  img.src=p.imageUrl||"";
   img.alt=nome;
   img.onerror=()=>img.style.display="none";
-
   const detalhes=document.createElement("div");
   detalhes.className="detalhes";
-
   const titulo=document.createElement("div");
   titulo.className="nome";
   titulo.textContent=nome;
-
   const valor=document.createElement("div");
   valor.className="preco";
   valor.textContent=dinheiro(preco);
-
   const com=document.createElement("div");
   com.className="comissao";
   com.textContent=comissao===null?"Comissão não informada":"Comissão: "+comissao.toFixed(2)+"%";
-
   const botaoLink=document.createElement("a");
   botaoLink.textContent="Ver oportunidade";
   botaoLink.href=link;
   botaoLink.target="_blank";
   botaoLink.rel="noopener";
-
   const botaoPreparar=document.createElement("button");
   botaoPreparar.className="botao preparar";
-  botaoPreparar.textContent="🧡 Preparar minha divulgação";
-  botaoPreparar.onclick=()=>prepararDivulgacao(p);
-
+  botaoPreparar.textContent="✨ Criar divulgação aqui";
+  botaoPreparar.onclick=()=>mostrarDivulgacao(p);
   detalhes.append(titulo,valor,com,botaoLink,botaoPreparar);
   card.append(img,detalhes);
   area.append(card);
  });
 }
-
 function filtrar(){
  const termo=document.getElementById("busca").value.toLowerCase();
  mostrar(lista.filter(p=>(p.productName||"").toLowerCase().includes(termo)));
 }
-
 fetch("./data/produtos.json")
 .then(r=>{if(!r.ok)throw Error();return r.json();})
 .then(d=>{
  lista=d.produtos||[];
- document.getElementById("resumo").textContent=
- "✨ "+lista.length+" oportunidades encontradas";
+ document.getElementById("resumo").textContent="✨ "+lista.length+" oportunidades encontradas";
  mostrar(lista);
 })
 .catch(()=>{
- document.getElementById("resumo").textContent=
- "Não foi possível carregar os produtos. Tente novamente mais tarde.";
+ document.getElementById("resumo").textContent="Não foi possível carregar os produtos. Tente novamente mais tarde.";
 });
 </script>
 </body>
