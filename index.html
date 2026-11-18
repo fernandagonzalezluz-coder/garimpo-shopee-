@@ -14,13 +14,14 @@ main{padding:16px;max-width:700px;margin:auto}
 input{width:100%;padding:13px;box-sizing:border-box;border:1px solid #ddd;border-radius:10px;font-size:16px}
 .info{background:white;padding:14px;border-radius:12px;margin:14px 0}
 #produtos{display:grid;gap:14px}
-.produto{background:white;border-radius:12px;padding:14px;display:flex;gap:12px;align-items:center}
+.produto{background:white;border-radius:12px;padding:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .produto img{width:95px;height:95px;object-fit:contain;border-radius:8px}
-.detalhes{flex:1;min-width:0}
+.detalhes{flex:1;min-width:180px}
 .nome{font-weight:bold;margin-bottom:8px}
 .preco{color:#ee4d2d;font-weight:bold;font-size:18px}
 .comissao{font-size:13px;color:#16834a;margin:7px 0}
-a{display:inline-block;background:#ee4d2d;color:white;text-decoration:none;padding:9px 12px;border-radius:8px;font-size:13px}
+a,.botao{display:inline-block;background:#ee4d2d;color:white;text-decoration:none;padding:10px 12px;border:0;border-radius:8px;font-size:13px;margin:4px 4px 4px 0;cursor:pointer}
+.preparar{background:#16834a;font-weight:bold}
 small{color:#777}
 </style>
 </head>
@@ -34,6 +35,7 @@ small{color:#777}
 <div class="info" id="resumo">Carregando oportunidades...</div>
 <div id="produtos"></div>
 </main>
+
 <script>
 let lista=[];
 
@@ -44,10 +46,65 @@ function dinheiro(v){
  return n.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 }
 
+function prepararDivulgacao(p){
+ const nome=p.productName||"Produto Shopee";
+ const link=p.offerLink||p.productLink||"Não informado";
+ let taxa=Number(p.commissionRate);
+ let comissao=Number.isFinite(taxa)?(taxa<=1?taxa*100:taxa):null;
+
+ const prompt=`Quero preparar a divulgação deste produto como afiliada da Shopee Brasil.
+
+PRODUTO: ${nome}
+PREÇO INFORMADO: ${dinheiro(p.priceMin??p.priceMax)}
+COMISSÃO INFORMADA: ${comissao===null?"Não informada":comissao.toFixed(2)+"%"}
+LOJA: ${p.shopName||"Não informada"}
+AVALIAÇÃO: ${p.ratingStar||"Não informada"}
+VENDAS: ${p.sales||"Não informadas"}
+LINK DE AFILIADA: ${link}
+IMAGEM: ${p.imageUrl||"Não informada"}
+
+Prepare um conteúdo de divulgação em português do Brasil:
+1. Uma descrição curta, atrativa e persuasiva.
+2. Um roteiro para vídeo vertical de 15 a 30 segundos.
+3. Sugestões de cenas e textos na tela.
+4. Uma narração simples e natural.
+5. Uma chamada para ação.
+6. Uma legenda para publicar no Shopee Vídeo.
+
+Se houver recurso de criação de vídeo disponível, ajude a criar o vídeo. Caso contrário, entregue o roteiro e as orientações para montar o vídeo.
+
+IMPORTANTE:
+- Não invente características, benefícios, descontos, preços, estoque ou informações que não foram fornecidas.
+- Não altere o link de afiliada. Preserve-o exatamente como está.
+- Use linguagem simples, criativa e comercial.
+- Não prometa resultados de venda.
+- Deixe o conteúdo pronto para eu usar.`;
+
+ try{
+  const area=document.createElement("textarea");
+  area.value=prompt;
+  area.style.position="fixed";
+  area.style.opacity="0";
+  document.body.appendChild(area);
+  area.select();
+  const copiou=document.execCommand("copy");
+  document.body.removeChild(area);
+
+  if(copiou){
+   alert("🧡 Informações copiadas! Agora abra o ChatGPT e cole a mensagem para preparar sua divulgação.");
+  }else{
+   alert("Não foi possível copiar automaticamente. Tente novamente.");
+  }
+ }catch(e){
+  alert("Não foi possível copiar. Tente novamente.");
+ }
+}
+
 function mostrar(itens){
  const area=document.getElementById("produtos");
  area.innerHTML="";
  if(!itens.length){area.innerHTML="<p>Nenhum produto encontrado.</p>";return;}
+
  itens.forEach(p=>{
   const nome=p.productName||"Produto Shopee";
   const preco=p.priceMin??p.priceMax;
@@ -55,29 +112,42 @@ function mostrar(itens){
   let comissao=Number.isFinite(taxa)?(taxa<=1?taxa*100:taxa):null;
   const link=p.offerLink||p.productLink||"#";
   const imagem=p.imageUrl||"";
+
   const card=document.createElement("div");
   card.className="produto";
+
   const img=document.createElement("img");
   img.src=imagem;
   img.alt=nome;
   img.onerror=()=>img.style.display="none";
+
   const detalhes=document.createElement("div");
   detalhes.className="detalhes";
+
   const titulo=document.createElement("div");
   titulo.className="nome";
   titulo.textContent=nome;
+
   const valor=document.createElement("div");
   valor.className="preco";
   valor.textContent=dinheiro(preco);
+
   const com=document.createElement("div");
   com.className="comissao";
   com.textContent=comissao===null?"Comissão não informada":"Comissão: "+comissao.toFixed(2)+"%";
-  const botao=document.createElement("a");
-  botao.textContent="Ver oportunidade";
-  botao.href=link;
-  botao.target="_blank";
-  botao.rel="noopener";
-  detalhes.append(titulo,valor,com,botao);
+
+  const botaoLink=document.createElement("a");
+  botaoLink.textContent="Ver oportunidade";
+  botaoLink.href=link;
+  botaoLink.target="_blank";
+  botaoLink.rel="noopener";
+
+  const botaoPreparar=document.createElement("button");
+  botaoPreparar.className="botao preparar";
+  botaoPreparar.textContent="🧡 Preparar minha divulgação";
+  botaoPreparar.onclick=()=>prepararDivulgacao(p);
+
+  detalhes.append(titulo,valor,com,botaoLink,botaoPreparar);
   card.append(img,detalhes);
   area.append(card);
  });
