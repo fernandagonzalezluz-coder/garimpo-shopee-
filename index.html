@@ -12,7 +12,8 @@ header{background:#ee4d2d;color:white;padding:25px 16px;text-align:center}
 h1{margin:0;font-size:25px}
 header p{margin:8px 0 0}
 main{padding:16px;max-width:760px;margin:auto}
-input{width:100%;padding:13px;border:1px solid #ddd;border-radius:10px;font-size:16px}
+input,textarea{width:100%;padding:13px;border:1px solid #ddd;border-radius:10px;font-size:16px;font-family:Arial}
+textarea{min-height:110px;resize:vertical}
 .info,.painel{background:white;padding:14px;border-radius:12px;margin:14px 0}
 #produtos{display:grid;gap:14px}
 .produto{background:white;border-radius:12px;padding:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
@@ -30,6 +31,11 @@ a,.botao{display:inline-block;background:#ee4d2d;color:white;text-decoration:non
 .bloco h3{font-size:15px;margin:0 0 8px}
 .bloco p{white-space:pre-wrap;line-height:1.5;margin:0;font-size:14px}
 .acoes{display:flex;flex-wrap:wrap;gap:5px}
+.verificador{background:#f3f8f3;border:1px solid #b8d9c0;border-radius:10px;padding:14px;margin-top:18px}
+.verificador h3{margin-top:0;color:#16834a}
+.resultado{padding:12px;border-radius:9px;background:white;margin-top:10px;line-height:1.5;font-size:14px}
+.alerta{color:#9a5a00}
+.ok{color:#16834a}
 small{color:#777}
 </style>
 </head>
@@ -38,6 +44,7 @@ small{color:#777}
 <h1>🧡 Meu Garimpo Shopee</h1>
 <p>Encontre produtos e prepare sua divulgação em um só lugar!</p>
 </header>
+
 <main>
 <input id="busca" placeholder="🔎 Buscar produto..." oninput="filtrar()">
 <div class="info" id="resumo">Carregando oportunidades...</div>
@@ -47,13 +54,24 @@ small{color:#777}
 <h2>✨ Sua divulgação está pronta!</h2>
 <p id="produtoSelecionado"></p>
 <div id="conteudo"></div>
+
+<div class="verificador">
+<h3>🛡️ Verificador de divulgação</h3>
+<p>Revise seu texto antes de publicar. Você também pode colar aqui uma legenda ou narração que queira conferir.</p>
+<textarea id="textoRevisao" placeholder="Cole aqui o texto que deseja revisar..."></textarea>
+<button class="botao preparar" onclick="verificarTexto()">🔎 Revisar divulgação</button>
+<div id="resultadoRevisao" class="resultado" style="display:none"></div>
+<p><small>Este é um filtro preventivo, não uma aprovação oficial da Shopee. Confira também as diretrizes atuais da plataforma.</small></p>
+</div>
+
 <div class="acoes">
 <button class="botao preparar" onclick="copiarTudo()">📋 Copiar divulgação completa</button>
 <button class="botao secundario" onclick="fecharPainel()">Fechar</button>
 </div>
-<p><small>Confira preço, informações e link antes de publicar. A publicação e a vinculação do produto são finalizadas no Shopee.</small></p>
+<p><small>Confira preço, informações e link antes de publicar. A publicação e a vinculação do produto são finalizadas na Shopee.</small></p>
 </section>
 </main>
+
 <script>
 let lista=[];
 let divulgacaoAtual=null;
@@ -64,42 +82,86 @@ function dinheiro(v){
  if(!Number.isFinite(n)) return String(v);
  return n.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 }
+
 function taxaComissao(p){
  let n=Number(p.commissionRate);
  return Number.isFinite(n)?(n<=1?n*100:n):null;
 }
+
 function escapar(s){
- return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+ return String(s??"").replace(/[&<>"']/g,c=>({
+ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+ }[c]));
 }
+
 function criarTexto(p){
  const nome=p.productName||"este produto";
  const preco=dinheiro(p.priceMin??p.priceMax);
  const link=p.offerLink||p.productLink||"";
- const descricao="Olha essa oportunidade! 🧡\n"+nome+"\nPreço informado: "+preco+".\nConfira os detalhes no link e veja se combina com você!";
- const roteiro="CENA 1 (0–5s)\nMostre a imagem do produto. Texto: “Olha essa oportunidade!”\n\nCENA 2 (5–12s)\nMostre o produto e destaque: "+nome+".\n\nCENA 3 (12–20s)\nExiba o preço informado: "+preco+". Convide a pessoa a conferir os detalhes.\n\nCENA 4 (20–25s)\nFinalize com: “Toque no produto vinculado para conferir!”";
- const cenas="1. Abertura com a imagem do produto.\n2. Nome do produto na tela.\n3. Preço informado, se disponível.\n4. Tela final convidando a conferir o produto.";
- const narracao="Encontrei essa oportunidade na Shopee! "+nome+". O preço informado é "+preco+". Toque no produto vinculado para conferir todos os detalhes antes de comprar!";
+
+ const descricao="Olha essa oportunidade! 🧡\n"+nome+
+ "\nPreço informado: "+preco+
+ ".\nConfira os detalhes na Shopee e veja se combina com você!";
+
+ const roteiro="CENA 1 (0–5s)\nMostre a imagem do produto. Texto: “Olha essa oportunidade!”"+
+ "\n\nCENA 2 (5–12s)\nMostre o produto e destaque: "+nome+"."+
+ "\n\nCENA 3 (12–20s)\nExiba o preço informado: "+preco+
+ ". Convide a pessoa a conferir os detalhes."+
+ "\n\nCENA 4 (20–25s)\nFinalize com: “Toque no produto vinculado para conferir!”";
+
+ const cenas="1. Abertura com a imagem do produto."+
+ "\n2. Nome do produto na tela."+
+ "\n3. Preço informado, se disponível."+
+ "\n4. Tela final convidando a conferir o produto.";
+
+ const narracao="Encontrei essa oportunidade na Shopee! "+nome+
+ ". O preço informado é "+preco+
+ ". Toque no produto vinculado para conferir todos os detalhes antes de comprar!";
+
  const chamada="🧡 Gostou? Toque no produto vinculado e confira na Shopee!";
- const legenda="✨ Garimpo do dia! "+nome+"\nConfira os detalhes e o preço atualizado diretamente na Shopee. 🧡\n#Shopee #Achadinhos #Oferta";
+
+ const legenda="✨ Garimpo do dia! "+nome+
+ "\nConfira os detalhes e o preço atualizado diretamente na Shopee. 🧡"+
+ "\n#Shopee #Achadinhos #Oferta";
+
  return {nome,preco,link,descricao,roteiro,cenas,narracao,chamada,legenda};
 }
+
 function mostrarDivulgacao(p){
  divulgacaoAtual=criarTexto(p);
- document.getElementById("produtoSelecionado").textContent=divulgacaoAtual.nome+" • "+divulgacaoAtual.preco;
+
+ document.getElementById("produtoSelecionado").textContent=
+ divulgacaoAtual.nome+" • "+divulgacaoAtual.preco;
+
  const campos=[
-  ["Descrição",divulgacaoAtual.descricao],
-  ["Roteiro para vídeo (até 25 segundos)",divulgacaoAtual.roteiro],
-  ["Sugestões de cenas",divulgacaoAtual.cenas],
-  ["Narração",divulgacaoAtual.narracao],
-  ["Chamada para ação",divulgacaoAtual.chamada],
-  ["Legenda para Shopee Vídeo",divulgacaoAtual.legenda],
-  ["Seu link de afiliada",divulgacaoAtual.link||"Link não disponível nos dados deste produto."]
+ ["Descrição",divulgacaoAtual.descricao],
+ ["Roteiro para vídeo (até 25 segundos)",divulgacaoAtual.roteiro],
+ ["Sugestões de cenas",divulgacaoAtual.cenas],
+ ["Narração",divulgacaoAtual.narracao],
+ ["Chamada para ação",divulgacaoAtual.chamada],
+ ["Legenda para Shopee Vídeo",divulgacaoAtual.legenda],
+ ["Seu link de afiliada",divulgacaoAtual.link||"Link não disponível nos dados deste produto."]
  ];
- document.getElementById("conteudo").innerHTML=campos.map((c,i)=>'<div class="bloco"><h3>'+escapar(c[0])+'</h3><p id="texto'+i+'">'+escapar(c[1])+'</p><button class="botao secundario" onclick="copiarCampo('+i+')">Copiar</button></div>').join("");
+
+ document.getElementById("conteudo").innerHTML=campos.map((c,i)=>
+ '<div class="bloco"><h3>'+escapar(c[0])+
+ '</h3><p id="texto'+i+'">'+escapar(c[1])+
+ '</p><button class="botao secundario" onclick="copiarCampo('+i+')">Copiar</button></div>'
+ ).join("");
+
+ document.getElementById("textoRevisao").value=
+ divulgacaoAtual.descricao+"\n\n"+
+ divulgacaoAtual.roteiro+"\n\n"+
+ divulgacaoAtual.narracao+"\n\n"+
+ divulgacaoAtual.legenda;
+
+ document.getElementById("resultadoRevisao").style.display="none";
+
  const painel=document.getElementById("painel");
  painel.style.display="block";
  painel.scrollIntoView({behavior:"smooth",block:"start"});
 }
+
 async function copiarTexto(texto){
  try{
   if(navigator.clipboard && window.isSecureContext){
@@ -119,74 +181,165 @@ async function copiarTexto(texto){
   alert("Não foi possível copiar automaticamente. Selecione o texto e copie manualmente.");
  }
 }
+
 function copiarCampo(i){
  const el=document.getElementById("texto"+i);
  copiarTexto(el?el.textContent:"");
 }
+
 function copiarTudo(){
  if(!divulgacaoAtual)return;
  const d=divulgacaoAtual;
- copiarTexto("PRODUTO: "+d.nome+"\nPREÇO INFORMADO: "+d.preco+"\n\nDESCRIÇÃO\n"+d.descricao+"\n\nROTEIRO\n"+d.roteiro+"\n\nCENAS\n"+d.cenas+"\n\nNARRAÇÃO\n"+d.narracao+"\n\nCHAMADA\n"+d.chamada+"\n\nLEGENDA\n"+d.legenda+"\n\nLINK DE AFILIADA\n"+d.link);
+ copiarTexto(
+ "PRODUTO: "+d.nome+
+ "\nPREÇO INFORMADO: "+d.preco+
+ "\n\nDESCRIÇÃO\n"+d.descricao+
+ "\n\nROTEIRO\n"+d.roteiro+
+ "\n\nCENAS\n"+d.cenas+
+ "\n\nNARRAÇÃO\n"+d.narracao+
+ "\n\nCHAMADA\n"+d.chamada+
+ "\n\nLEGENDA\n"+d.legenda+
+ "\n\nLINK DE AFILIADA\n"+d.link
+ );
 }
+
+function verificarTexto(){
+ const texto=document.getElementById("textoRevisao").value.trim();
+ const resultado=document.getElementById("resultadoRevisao");
+
+ if(!texto){
+  alert("Cole ou escreva um texto para revisar.");
+  return;
+ }
+
+ const regras=[
+  {termos:["garantia de venda","venda garantida","ganho garantido","renda garantida"],mensagem:"Promessa de venda ou ganho garantido."},
+  {termos:["cura","milagre","resultado garantido","emagrece rápido","emagrecimento garantido"],mensagem:"Alegação de saúde ou resultado que pode exigir comprovação e pode ser proibida."},
+  {termos:["últimas unidades","só hoje","corra que acaba","estoque acabando"],mensagem:"Urgência ou escassez. Confirme se é verdadeira e permitida."},
+  {termos:["menor preço do brasil","o melhor do brasil","100% aprovado"],mensagem:"Afirmação absoluta que precisa de comprovação."},
+  {termos:["frete grátis","desconto exclusivo","50% off","70% off","promoção imperdível"],mensagem:"Oferta ou desconto. Confira se existe e se está válido."},
+  {termos:["oficial da shopee","parceria oficial shopee"],mensagem:"Possível afirmação de vínculo oficial. Só use se for verdadeira e autorizada."}
+ ];
+
+ const normalizado=texto.toLocaleLowerCase("pt-BR");
+ const encontrados=[];
+
+ regras.forEach(regra=>{
+  if(regra.termos.some(t=>normalizado.includes(t))){
+   encontrados.push(regra.mensagem);
+  }
+ });
+
+ const mencionaPreco=/r\$\s?\d/.test(normalizado);
+ const precoInformado=divulgacaoAtual&&
+ divulgacaoAtual.preco!=="Preço não informado";
+
+ let html="";
+
+ if(encontrados.length){
+  html='<strong class="alerta">⚠️ Atenção: encontramos pontos para revisar.</strong><ul>'+
+  encontrados.map(x=>"<li>"+escapar(x)+"</li>").join("")+"</ul>";
+ }else{
+  html='<strong class="ok">✅ Nenhuma das expressões de risco monitoradas foi encontrada.</strong>';
+ }
+
+ if(mencionaPreco){
+  html+='<p>💰 Confira se o preço mencionado continua atualizado na página do produto.</p>';
+ }
+
+ if(!precoInformado){
+  html+='<p>ℹ️ O preço não foi localizado nos dados do produto. Evite inventar um valor.</p>';
+ }
+
+ html+='<p><strong>Antes de publicar:</strong> confira se o vídeo mostra o produto correto, se o produto está vinculado, se você tem autorização para usar as imagens e se o conteúdo respeita as regras da Shopee.</p>';
+
+ html+='<p><small>O verificador procura apenas alguns termos e situações. Ele não consegue identificar todas as violações nem garantir aprovação.</small></p>';
+
+ resultado.innerHTML=html;
+ resultado.style.display="block";
+}
+
 function fecharPainel(){
  document.getElementById("painel").style.display="none";
 }
+
 function mostrar(itens){
  const area=document.getElementById("produtos");
  area.innerHTML="";
+
  if(!itens.length){
   area.innerHTML="<p>Nenhum produto encontrado.</p>";
   return;
  }
+
  itens.forEach(p=>{
   const nome=p.productName||"Produto Shopee";
   const preco=p.priceMin??p.priceMax;
   const comissao=taxaComissao(p);
   const link=p.offerLink||p.productLink||"#";
+
   const card=document.createElement("div");
   card.className="produto";
+
   const img=document.createElement("img");
   img.src=p.imageUrl||"";
   img.alt=nome;
   img.onerror=()=>img.style.display="none";
+
   const detalhes=document.createElement("div");
   detalhes.className="detalhes";
+
   const titulo=document.createElement("div");
   titulo.className="nome";
   titulo.textContent=nome;
+
   const valor=document.createElement("div");
   valor.className="preco";
   valor.textContent=dinheiro(preco);
+
   const com=document.createElement("div");
   com.className="comissao";
-  com.textContent=comissao===null?"Comissão não informada":"Comissão: "+comissao.toFixed(2)+"%";
+  com.textContent=comissao===null?
+  "Comissão não informada":"Comissão: "+comissao.toFixed(2)+"%";
+
   const botaoLink=document.createElement("a");
   botaoLink.textContent="Ver oportunidade";
   botaoLink.href=link;
   botaoLink.target="_blank";
   botaoLink.rel="noopener";
+
   const botaoPreparar=document.createElement("button");
   botaoPreparar.className="botao preparar";
   botaoPreparar.textContent="✨ Criar divulgação aqui";
   botaoPreparar.onclick=()=>mostrarDivulgacao(p);
+
   detalhes.append(titulo,valor,com,botaoLink,botaoPreparar);
   card.append(img,detalhes);
   area.append(card);
  });
 }
+
 function filtrar(){
  const termo=document.getElementById("busca").value.toLowerCase();
- mostrar(lista.filter(p=>(p.productName||"").toLowerCase().includes(termo)));
+ mostrar(lista.filter(p=>
+ (p.productName||"").toLowerCase().includes(termo)
+ ));
 }
+
 fetch("./data/produtos.json")
-.then(r=>{if(!r.ok)throw Error();return r.json();})
+.then(r=>{
+ if(!r.ok)throw Error();
+ return r.json();
+})
 .then(d=>{
  lista=d.produtos||[];
- document.getElementById("resumo").textContent="✨ "+lista.length+" oportunidades encontradas";
+ document.getElementById("resumo").textContent=
+ "✨ "+lista.length+" oportunidades encontradas";
  mostrar(lista);
 })
 .catch(()=>{
- document.getElementById("resumo").textContent="Não foi possível carregar os produtos. Tente novamente mais tarde.";
+ document.getElementById("resumo").textContent=
+ "Não foi possível carregar os produtos. Tente novamente mais tarde.";
 });
 </script>
 </body>
