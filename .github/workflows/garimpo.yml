@@ -1,0 +1,43 @@
+name: Garimpo Shopee Diário
+
+on:
+
+  workflow_dispatch:
+
+  schedule:
+
+    - cron: "0 11 * * *"
+
+jobs:
+
+  garimpo:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Baixar projeto
+
+        uses: actions/checkout@v4
+
+      - name: Preparar Python
+
+        uses: actions/setup-python@v5
+
+        with:
+
+          python-version: "3.12"
+
+      - name: Executar garimpo
+
+        env:
+
+          SHOPEE_APP_ID: ${{ secrets.SHOPEE_APP_ID }}
+
+          SHOPEE_SECRET: ${{ secrets.SHOPEE_SECRET }}
+
+        run: |
+
+          echo "Automação Shopee iniciada!"
+
+          echo "Credenciais configuradas."
