@@ -8,6 +8,10 @@ on:
 
     - cron: "0 11 * * *"
 
+permissions:
+
+  contents: write
+
 jobs:
 
   garimpo:
@@ -28,7 +32,7 @@ jobs:
 
           python-version: "3.12"
 
-      - name: Executar garimpo
+      - name: Executar busca
 
         env:
 
@@ -36,8 +40,18 @@ jobs:
 
           SHOPEE_SECRET: ${{ secrets.SHOPEE_SECRET }}
 
+        run: python buscar_produtos.py
+
+      - name: Salvar relatório
+
         run: |
 
-          echo "Automação Shopee iniciada!"
+          git config user.name "Garimpo Shopee"
 
-          echo "Credenciais configuradas."
+          git config user.email "actions@github.com"
+
+          git add data/produtos.json
+
+          git diff --cached --quiet || git commit -m "Atualizar garimpo diário"
+
+          git push
